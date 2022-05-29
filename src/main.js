@@ -1,52 +1,99 @@
-import { stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { program } from 'commander';
+import { program, InvalidArgumentError } from 'commander';
+import { tmpNameSync } from 'tmp';
+import { resolve, extname } from 'node:path';
+import { unlink, rename } from 'node:fs/promises';
+import fileExists from './utils/fileExists.js';
+import crop_file from './crop-file.js';
 import detect_dimensions from './detect-dimensions.js';
 
-const fileExists = async(file) => {
-    try {
-        return !!(await stat(file));
+const withCommonErrorHandlingAndParsing = method => {
+    return async(...args) => {
+        try {
+            const options = Object.assign(
+                {},
+                program.opts(),
+                args[args.length - 2]
+            );
+            await method(...args.slice(0, args.length - 2), options);
+        }
+        catch(e) {
+            if (e.code === 'ENOENT') {
+                console.error('Unable to find "ffmpeg" and "ffprobe" binaries. Did you try adding --ffmpeg-root?');
+            }
+            else {
+                console.error(e.message);
+            }
+        }
+    };
+};
+
+const cropFile = async(inputFile, outputFile, { ffmpegRoot, crop }) => {
+    const { x, y, xOffset, yOffset, fileX, fileY } = await detect_dimensions(inputFile, ffmpegRoot);
+    if (!crop || crop === 'auto') {
+        crop = [x, y, xOffset, yOffset];
     }
-    catch(e) {
-        return false;
+    if (crop[0] === fileX && crop[1] === fileY) {
+        throw new Error('Output file dimensions already match, file does not need cropping');
+    }
+
+    let inPlace = false;
+    if (outputFile === 'in-place') {
+        inPlace = true;
+        outputFile = tmpNameSync({
+            postfix: extname(inputFile)
+        });
+    }
+    await crop_file(inputFile, outputFile, crop, fileX, fileY, ffmpegRoot);
+    if (inPlace) {
+        await unlink(inputFile);
+        await rename(outputFile, inputFile);
     }
 };
 
-const detect = async(file) => {
-    try {
-        const path = resolve(file);
-        if (!fileExists(path)) {
-            throw new Error('File does not exist');
-        }
-        const { x, y, xOffset, yOffset, aspect } = await detect_dimensions(path, program.opts().ffmpegRoot);
-        console.error(`width:\t\t${x}\n` +
-                      `height:\t\t${y}\n` +
-                      `left_offset:\t${xOffset}\n` +
-                      `top_offset:\t${yOffset}\n` +
-                      `aspect:\t\t${aspect}`);
+const detect = async(file, { ffmpegRoot }) => {
+    const { x, y, xOffset, yOffset, aspect, fileX, fileY } = await detect_dimensions(file, ffmpegRoot);
+    console.error(`file_width:\t${fileX}\n` +
+                    `file_height"\t${fileY}\n` +
+                    `actual_width:\t${x}\n` +
+                    `actual_height:\t${y}\n` +
+                    `left_offset:\t${xOffset}\n` +
+                    `top_offset:\t${yOffset}\n` +
+                    `aspect:\t\t${aspect}`);
+};
+
+const parseFilePath = value => {
+    const inputPath = resolve(value);
+    if (!fileExists(inputPath)) {
+        throw new InvalidArgumentError(`File "${value}" does not exist.`);
     }
-    catch(e) {
-        if (e.code === 'ENOENT') {
-            console.error('Unable to find "ffmpeg" and "ffprobe" binaries. Did you try adding --ffmpeg-root?');
-        }
-        else {
-            console.error(e.message);
-        }
+    return inputPath;
+};
+
+const parseCrop = value => {
+    if (value === 'auto') {
+        return value;
     }
+    if (!/^[0-9]+:[0-9]+:[0-9]+:[0-9]+$/.test(value)) {
+        throw new InvalidArgumentError(`Crop must follow the format "width:height:left_offset:top_offset" where each value is in px`);
+    }
+    return value.split(':').map(i => parseInt(i));
 };
 
 program.name('cropper')
     .description('Detects true size and crops videos using ffmpeg')
     .version('1.0.0')
-    .option('-f, --ffmpeg-root <path>', 'path to ffmpeg');
+    .option('-f, --ffmpeg-root <path>', 'path to ffmpeg', parseFilePath);
 
 program.command('detect')
     .description('Detects the true dimensions of a video')
-    .argument('<file>', 'video file to detect dimensions of')
-    .action(detect);
+    .argument('<file>', 'video file to detect dimensions of', parseFilePath)
+    .action(withCommonErrorHandlingAndParsing(detect));
 
 program.command('crop')
     .description('Crop a file using ffmpeg')
-    .argument('<file>', 'video file to detect dimensions of');
+    .argument('<file>', 'video file to remove black borders from', parseFilePath)
+    .argument('<output>', 'output file to save the cropped version as, or "in-place" to replace the existing file.', value => resolve(value))
+    .option('-c, --crop <crop>', 'crop to use in the format "width:height:left_offset:top_offset" (px). A special value of "auto" is also accepted.', parseCrop, 'auto')
+    .action(withCommonErrorHandlingAndParsing(cropFile));
 
 await program.parse();

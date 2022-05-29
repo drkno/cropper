@@ -6,6 +6,9 @@ class ChildProcess extends EventEmitter {
     constructor(command, args = [], options = {}, ...extendedPath) {
         super();
 
+        this._disableStdPipeAppend = options.disableStdPipeAppend || false;
+        delete options.disableStdPipeAppend;
+
         this._onStdOut = this._onStdOut.bind(this);
         this._onStdErr = this._onStdErr.bind(this);
         this._onError = this._onError.bind(this);
@@ -42,6 +45,10 @@ class ChildProcess extends EventEmitter {
         return this._code;
     }
 
+    getAwaitablePromise() {
+        return this._promise;
+    }
+
     kill(signal) {
         return this._process.kill(signal);
     }
@@ -58,13 +65,17 @@ class ChildProcess extends EventEmitter {
     _onStdOut(data) {
         const dataStr = data.toString('utf-8');
         this.emit('stdout', dataStr);
-        this._stdout += dataStr;
+        if (!this._disableStdPipeAppend) {
+            this._stdout += dataStr;
+        }
     }
 
     _onStdErr(data) {
         const dataStr = data.toString('utf-8');
         this.emit('stderr', dataStr);
-        this._stderr += dataStr;
+        if (!this._disableStdPipeAppend) {
+            this._stderr += dataStr;
+        }
     }
 
     _onClose(code) {

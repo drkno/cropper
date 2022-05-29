@@ -22,6 +22,9 @@ class DimensionsDetector {
         if (!this._checkValidityAndSetAspect(dim)) {
             throw new Error('Cannot calculate dimensions, calculated ended up with an unexpected ratio.');
         }
+        const originalDimensions = await this._getReportedDimensions(file, ffmpegPath);
+        dim.fileX = originalDimensions.width;
+        dim.fileY = originalDimensions.height;
         return dim;
     }
 
@@ -32,6 +35,16 @@ class DimensionsDetector {
     _toTime(duration) {
         const date = new Date(duration * 1000);
         return `${date.getUTCHours()}:${this._pad(date.getUTCMinutes())}:${this._pad(date.getSeconds())}`;
+    }
+
+    async _getReportedDimensions(file, ffmpegPath) {
+        const childProcess = new ChildProcess('ffprobe',
+            ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", file],
+            {},
+            ffmpegPath
+        );
+        const output = await childProcess.getStdOut();
+        return JSON.parse(output).streams[0];
     }
 
     async _probe(file, fromTime, ffmpegPath) {
@@ -85,10 +98,10 @@ class DimensionsDetector {
                 yOffset: {}
             });
         return {
-            x: this._getMostCommon(cropDimensions.x),
-            y: this._getMostCommon(cropDimensions.y),
-            xOffset: this._getMostCommon(cropDimensions.xOffset),
-            yOffset: this._getMostCommon(cropDimensions.yOffset)
+            x: parseInt(this._getMostCommon(cropDimensions.x)),
+            y: parseInt(this._getMostCommon(cropDimensions.y)),
+            xOffset: parseInt(this._getMostCommon(cropDimensions.xOffset)),
+            yOffset: parseInt(this._getMostCommon(cropDimensions.yOffset))
         };
     }
 
