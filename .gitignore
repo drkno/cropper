@@ -1,3 +1,7 @@
 **/node_modules
 **/temp
 **/tmp
+ffmpeg
+*.mkv
+*.mp4
+*.avi

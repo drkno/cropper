@@ -70,7 +70,9 @@ class DimensionsDetector {
         const tenth = duration / 10;
         const probePoints = [
             tenth,
+            tenth * 3,
             tenth * 5,
+            tenth * 7,
             tenth * 9
         ];
 
@@ -119,10 +121,21 @@ class DimensionsDetector {
         for (let known in KnownRatios) {
             if (Math.abs(KnownRatios[known] - ratio) < 0.1) {
                 dimension.aspect = known;
+                this._fixCropToMatchAspect(dimension, KnownRatios[known]);
                 return true;
             }
         }
         return false;
+    }
+
+    _fixCropToMatchAspect(dimension, expected) {
+        if (dimension.xOffset === 0 && dimension.yOffset < 10) {
+            dimension.y = Math.floor(dimension.x / expected);
+            dimension.yOffset = 0;
+        } else if (dimension.yOffset === 0 && dimension.xOffset < 10) {
+            dimension.x = Math.floor(dimension.y * expected);
+            dimension.xOffset = 0;
+        }
     }
 }
 

@@ -3,7 +3,7 @@ import { tmpNameSync } from 'tmp';
 import { resolve, extname } from 'node:path';
 import { unlink, rename } from 'node:fs/promises';
 import fileExists from './utils/fileExists.js';
-import crop_file from './crop-file.js';
+import crop_file, { DefaultFfmpegCropTemplate } from './crop-file.js';
 import detect_dimensions from './detect-dimensions.js';
 
 const withCommonErrorHandlingAndParsing = method => {
@@ -27,7 +27,7 @@ const withCommonErrorHandlingAndParsing = method => {
     };
 };
 
-const cropFile = async(inputFile, outputFile, { ffmpegRoot, crop }) => {
+const cropFile = async(inputFile, outputFile, { ffmpegRoot, crop, metadata, ffmpegOptions }) => {
     const { x, y, xOffset, yOffset, fileX, fileY } = await detect_dimensions(inputFile, ffmpegRoot);
     if (!crop || crop === 'auto') {
         crop = [x, y, xOffset, yOffset];
@@ -43,22 +43,34 @@ const cropFile = async(inputFile, outputFile, { ffmpegRoot, crop }) => {
             postfix: extname(inputFile)
         });
     }
-    await crop_file(inputFile, outputFile, crop, fileX, fileY, ffmpegRoot);
+    await crop_file(inputFile, outputFile, crop, fileX, fileY, metadata, ffmpegRoot, ffmpegOptions);
     if (inPlace) {
         await unlink(inputFile);
         await rename(outputFile, inputFile);
     }
 };
 
-const detect = async(file, { ffmpegRoot }) => {
+const detect = async(file, { ffmpegRoot, json }) => {
     const { x, y, xOffset, yOffset, aspect, fileX, fileY } = await detect_dimensions(file, ffmpegRoot);
-    console.error(`file_width:\t${fileX}\n` +
-                    `file_height"\t${fileY}\n` +
-                    `actual_width:\t${x}\n` +
-                    `actual_height:\t${y}\n` +
-                    `left_offset:\t${xOffset}\n` +
-                    `top_offset:\t${yOffset}\n` +
-                    `aspect:\t\t${aspect}`);
+    if (json) {
+        console.info(JSON.stringify({
+            file_width: fileX,
+            file_height: fileY,
+            actual_width: x,
+            actual_height: y,
+            left_offset: xOffset,
+            top_offset: yOffset,
+            aspect
+        }, null, 4));
+    } else {
+        console.info(`file_width:\t${fileX}\n` +
+            `file_height:\t${fileY}\n` +
+            `actual_width:\t${x}\n` +
+            `actual_height:\t${y}\n` +
+            `left_offset:\t${xOffset}\n` +
+            `top_offset:\t${yOffset}\n` +
+            `aspect:\t\t${aspect}`);
+    }
 };
 
 const parseFilePath = value => {
@@ -82,7 +94,8 @@ const parseCrop = value => {
 program.name('cropper')
     .description('Detects true size and crops videos using ffmpeg')
     .version('1.0.0')
-    .option('-f, --ffmpeg-root <path>', 'path to ffmpeg', parseFilePath);
+    .option('-f, --ffmpeg-root <path>', 'path to ffmpeg', parseFilePath)
+    .option('-j, --json', 'output as json');
 
 program.command('detect')
     .description('Detects the true dimensions of a video')
@@ -94,6 +107,8 @@ program.command('crop')
     .argument('<file>', 'video file to remove black borders from', parseFilePath)
     .argument('<output>', 'output file to save the cropped version as, or "in-place" to replace the existing file.', value => resolve(value))
     .option('-c, --crop <crop>', 'crop to use in the format "width:height:left_offset:top_offset" (px). A special value of "auto" is also accepted.', parseCrop, 'auto')
+    .option('-t, --ffmpeg-options <options>', 'options string to use when cropping', value => value, DefaultFfmpegCropTemplate)
+    .option('-m, --metadata', 'crop using metadata instead of re-encoding (h264 and hevc only). This option has inconsistent results in different players.')
     .action(withCommonErrorHandlingAndParsing(cropFile));
 
 await program.parse();
