@@ -8,12 +8,12 @@ RUN mkdir -p /opt/ffmpeg && \
     ln -s /opt/ffmpeg/ffprobe /usr/bin/ffprobe && \
     rm ffmpeg.tar.xz
 
-COPY ./src /opt/server
+COPY ./ /opt/server
 
 RUN cd /opt/server && npm install
 
 WORKDIR /opt/server
-ENTRYPOINT [ "node", "main.js" ]
+ENTRYPOINT [ "node", "src/main.js", "--ffmpeg-root", "/opt/ffmpeg" ]
 EXPOSE 4300
 VOLUME [ "/config" ]
-CMD [ "--ffmpeg-root", "/opt/ffmpeg", "serve" ]
+CMD [ "serve" ]
