@@ -1,11 +1,15 @@
 import { program, InvalidArgumentError } from 'commander';
 import { tmpNameSync } from 'tmp';
 import { resolve, extname } from 'node:path';
-import { unlink, rename } from 'node:fs/promises';
+import { unlink } from 'node:fs/promises';
+import { promisify } from 'util';
+import mv from 'mv';
 import fileExists from './utils/fileExists.js';
 import crop_file, { DefaultFfmpegCropTemplate } from './crop-file.js';
 import detect_dimensions from './detect-dimensions.js';
 import server from './serve/server.js';
+
+const mvp = promisify(mv);
 
 const withCommonErrorHandlingAndParsing = method => {
     return async(...args) => {
@@ -47,7 +51,7 @@ const cropFile = async(inputFile, outputFile, { ffmpegRoot, crop, metadata, ffmp
     await crop_file(inputFile, outputFile, crop, fileX, fileY, metadata, ffmpegRoot, ffmpegOptions);
     if (inPlace) {
         await unlink(inputFile);
-        await rename(outputFile, inputFile);
+        await mvp(outputFile, inputFile)
     }
 };
 
@@ -84,6 +88,13 @@ const parseFilePath = value => {
     return inputPath;
 };
 
+const parseFilePathOrInPlace = value => {
+    if (value === 'in-place') {
+        return value;
+    }
+    return parseFilePath(value);
+}
+
 const parseCrop = value => {
     if (value === 'auto') {
         return value;
@@ -108,7 +119,7 @@ program.command('detect')
 program.command('crop')
     .description('Crop a file using ffmpeg')
     .argument('<file>', 'video file to remove black borders from', parseFilePath)
-    .argument('<output>', 'output file to save the cropped version as, or "in-place" to replace the existing file.', value => resolve(value))
+    .argument('<output>', 'output file to save the cropped version as, or "in-place" to replace the existing file.', parseFilePathOrInPlace)
     .option('-c, --crop <crop>', 'crop to use in the format "width:height:left_offset:top_offset" (px). A special value of "auto" is also accepted.', parseCrop, 'auto')
     .option('-t, --ffmpeg-options <options>', 'options string to use when cropping', value => value, DefaultFfmpegCropTemplate)
     .option('-m, --metadata', 'crop using metadata instead of re-encoding (h264 and hevc only). This option has inconsistent results in different players.')
