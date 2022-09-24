@@ -5,6 +5,7 @@ import { unlink, rename } from 'node:fs/promises';
 import fileExists from './utils/fileExists.js';
 import crop_file, { DefaultFfmpegCropTemplate } from './crop-file.js';
 import detect_dimensions from './detect-dimensions.js';
+import server from './serve/server.js';
 
 const withCommonErrorHandlingAndParsing = method => {
     return async(...args) => {
@@ -73,6 +74,8 @@ const detect = async(file, { ffmpegRoot, json }) => {
     }
 };
 
+const serve = async(options) => server(options, detect, cropFile);
+
 const parseFilePath = value => {
     const inputPath = resolve(value);
     if (!fileExists(inputPath)) {
@@ -110,5 +113,13 @@ program.command('crop')
     .option('-t, --ffmpeg-options <options>', 'options string to use when cropping', value => value, DefaultFfmpegCropTemplate)
     .option('-m, --metadata', 'crop using metadata instead of re-encoding (h264 and hevc only). This option has inconsistent results in different players.')
     .action(withCommonErrorHandlingAndParsing(cropFile));
+
+program.command('serve')
+    .description('Start a server to receive events from Sonarr and Radarr')
+    .option('-c, --paths', 'path mappings in the format "request_path:cropper_path,request_path2:cropper_path2"', value => value, '')
+    .option('-c, --crop <crop>', 'crop to use in the format "width:height:left_offset:top_offset" (px). A special value of "auto" is also accepted.', parseCrop, 'auto')
+    .option('-t, --ffmpeg-options <options>', 'options string to use when cropping', value => value, DefaultFfmpegCropTemplate)
+    .option('-m, --metadata', 'crop using metadata instead of re-encoding (h264 and hevc only). This option has inconsistent results in different players.')
+    .action(withCommonErrorHandlingAndParsing(serve));
 
 await program.parse();

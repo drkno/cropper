@@ -87,6 +87,7 @@ class ChildProcess extends EventEmitter {
         };
         this._resolve(result);
         this.emit('close', result);
+        this.removeAllListeners();
     }
 
     _onError(err) {

@@ -18,7 +18,7 @@ class VideoCropper {
             await this._metadata_crop(inputFile, outputFile, crop, fileX, fileY, codec, ffmpegPath);
         }
         else {
-            this._encode_crop(ffmpegOptions, inputFile, outputFile, crop, ffmpegPath);
+            await this._encode_crop(ffmpegOptions, inputFile, outputFile, crop, ffmpegPath);
         }
     }
 
