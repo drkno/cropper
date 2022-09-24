@@ -16,4 +16,4 @@ WORKDIR /opt/server
 ENTRYPOINT [ "node", "main.js" ]
 EXPOSE 4300
 VOLUME [ "/config" ]
-CMD [ "--serve" ]
+CMD [ "--ffmpeg-root", "/opt/ffmpeg", "serve" ]
