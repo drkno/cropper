@@ -33,7 +33,7 @@ class Queue {
         const mappings = paths.split(',')
             .filter(mapping => mapping !== '')
             .map(spl => spl.split(':'))
-            .filter(mapping => mapping.length !== 2);
+            .filter(mapping => mapping.length === 2);
         return path => {
             for (let mapping of mappings) {
                 path = path.replaceAll(mapping[0], mapping[1]);
@@ -47,8 +47,9 @@ class Queue {
         const pathIndex = this.queue.indexOf(newFile);
         if (pathIndex < 0) {
             this.queue.push(newFile);
+            const position = this.queue.length - 1;
             this._consumeFromQueue();
-            return this.queue.length - 1;
+            return position;
         }
         return pathIndex;
     }
