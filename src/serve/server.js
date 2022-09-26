@@ -64,7 +64,7 @@ class Server {
             case 'downloadFolderImported':
             case 'DownloadFolderImported':
                 if (!req.body.data || !req.body.data.importedPath) {
-                    console.warn('Request received for downloadFolderImported without an importedPath');
+                    console.warn('Request received for downloadFolderImported without an importedPath:\n' + JSON.stringify(req.body, null, 4));
                     res.json({
                         success: false,
                         detail: {
@@ -83,12 +83,9 @@ class Server {
                     }
                 });
                 break;
-            case 'EpisodeFileDeleted':
-            case 'episodeFileDeleted':
-            case 'MovieFileDeleted':
-            case 'movieFileDeleted':
-                if (!req.body.sourceTitle) {
-                    console.warn('Request received for episodeFileDeleted/movieFileDeleted without a sourceTitle');
+            case 'EpisodeFileDelete':
+                if (!req.body.episodeFile || !req.body.episodeFile.path) {
+                    console.warn('Request received for EpisodeFileDelete without a path:\n' + JSON.stringify(req.body, null, 4));
                     res.json({
                         success: false,
                         detail: {
@@ -98,7 +95,28 @@ class Server {
                     });
                     return;
                 }
-                const deletedPosition = this.queue.removeFromQueue(req.body.sourceTitle);
+                const episodeDeletedPosition = this.queue.removeFromQueue(req.body.episodeFile.path);
+                res.json({
+                    success: true,
+                    detail: {
+                        type: 'webhook/arr/remove',
+                        position: episodeDeletedPosition
+                    }
+                });
+                break;
+            case 'MovieFileDelete':
+                if (!req.body.movieFile || !req.body.movieFile.path) {
+                    console.warn('Request received for MovieFileDelete without a path:\n' + JSON.stringify(req.body, null, 4));
+                    res.json({
+                        success: false,
+                        detail: {
+                            type: 'webhook/arr/remove',
+                            error: 'No file path provided in event'
+                        }
+                    });
+                    return;
+                }
+                const deletedPosition = this.queue.removeFromQueue(req.body.movieFile.path);
                 res.json({
                     success: true,
                     detail: {
