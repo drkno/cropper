@@ -62,6 +62,7 @@ class Server {
     async arrWebhook(req, res) {
         switch (req.body.eventType) {
             case 'downloadFolderImported':
+            case 'DownloadFolderImported':
                 if (!req.body.data || !req.body.data.importedPath) {
                     console.warn('Request received for downloadFolderImported without an importedPath');
                     res.json({
@@ -82,7 +83,9 @@ class Server {
                     }
                 });
                 break;
+            case 'EpisodeFileDeleted':
             case 'episodeFileDeleted':
+            case 'MovieFileDeleted':
             case 'movieFileDeleted':
                 if (!req.body.sourceTitle) {
                     console.warn('Request received for episodeFileDeleted/movieFileDeleted without a sourceTitle');
@@ -129,6 +132,7 @@ class Server {
         const program = this.getProgramName(req.body);
         const warning = `Non-relevant ${program} event received: ${req.body.eventType}. Update your ${program} settings to remove this warning.`;
         console.warn(warning);
+        console.warn('Event was:\n' + JSON.stringify(req.body, null, 4));
         res.json({
             success: false,
             detail: {

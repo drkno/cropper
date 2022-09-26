@@ -19,11 +19,13 @@ class Queue {
 
         while (this.queue.length > 0) {
             this.itemBeingConsumed = this.queue.shift();
+            console.info(`Starting crop on ${this.itemBeingConsumed}`);
             try {
                 await this.cropFileFunction(this.itemBeingConsumed, 'in-place', this.cliOptions);
             } catch (e) {
                 console.error(e);
             }
+            console.info(`Crop complete on ${this.itemBeingConsumed}`);
         }
 
         this.consumptionInProgress = false;
