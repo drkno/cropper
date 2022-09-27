@@ -1,5 +1,6 @@
 import express, { json as ejson } from 'express';
 import { promisify } from 'util';
+import { join } from 'path';
 import Queue from './queue.js';
 
 class Server {
@@ -60,11 +61,13 @@ class Server {
     }
 
     async arrWebhook(req, res) {
-        switch (req.body.eventType) {
-            case 'downloadFolderImported':
-            case 'DownloadFolderImported':
-                if (!req.body.data || !req.body.data.importedPath) {
-                    console.warn('Request received for downloadFolderImported without an importedPath:\n' + JSON.stringify(req.body, null, 4));
+        const event = req.body;
+        switch (event.eventType) {
+            case 'Download':
+                const isSonarr = event.series && event.series.path && event.episodeFile && event.episodeFile.relativePath;
+                const isRadarr = event.movie && event.movie.folderPath && event.movieFile && event.movieFile.relativePath;
+                if (!isSonarr && !isRadarr) {
+                    console.warn('Request received for downloadFolderImported without an importedPath:\n' + JSON.stringify(event, null, 4));
                     res.json({
                         success: false,
                         detail: {
@@ -74,7 +77,10 @@ class Server {
                     });
                     return;
                 }
-                const addedPosition = this.queue.addToQueue(req.body.data.importedPath);
+                const addPath = isSonarr
+                    ? join(event.series.path, event.episodeFile.relativePath)
+                    : join(event.movie.folderPath, event.movieFile.relativePath);
+                const addedPosition = this.queue.addToQueue(addPath);
                 res.json({
                     success: true,
                     detail: {
@@ -83,9 +89,12 @@ class Server {
                     }
                 });
                 break;
+            case 'MovieFileDelete':
             case 'EpisodeFileDelete':
-                if (!req.body.episodeFile || !req.body.episodeFile.path) {
-                    console.warn('Request received for EpisodeFileDelete without a path:\n' + JSON.stringify(req.body, null, 4));
+                const isSonarrDelete = event.episodeFile && event.episodeFile.path;
+                const isRadarrDelete = event.movieFile && event.movieFile.path;
+                if (!isSonarrDelete && !isRadarrDelete) {
+                    console.warn('Request received for EpisodeFileDelete without a path:\n' + JSON.stringify(event, null, 4));
                     res.json({
                         success: false,
                         detail: {
@@ -95,33 +104,15 @@ class Server {
                     });
                     return;
                 }
-                const episodeDeletedPosition = this.queue.removeFromQueue(req.body.episodeFile.path);
+                const deletePath = isSonarrDelete
+                    ? event.episodeFile.path
+                    : event.movieFile.path;
+                const episodeDeletedPosition = this.queue.removeFromQueue(deletePath);
                 res.json({
                     success: true,
                     detail: {
                         type: 'webhook/arr/remove',
                         position: episodeDeletedPosition
-                    }
-                });
-                break;
-            case 'MovieFileDelete':
-                if (!req.body.movieFile || !req.body.movieFile.path) {
-                    console.warn('Request received for MovieFileDelete without a path:\n' + JSON.stringify(req.body, null, 4));
-                    res.json({
-                        success: false,
-                        detail: {
-                            type: 'webhook/arr/remove',
-                            error: 'No file path provided in event'
-                        }
-                    });
-                    return;
-                }
-                const deletedPosition = this.queue.removeFromQueue(req.body.movieFile.path);
-                res.json({
-                    success: true,
-                    detail: {
-                        type: 'webhook/arr/remove',
-                        position: deletedPosition
                     }
                 });
                 break;
