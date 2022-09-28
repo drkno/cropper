@@ -8,6 +8,7 @@ const KnownRatios = {
     '2.21:1 (widescreen)':  2.21,
     '2.35:1 (anamorphic)':  2.35,
     '2.39:1 (anamorphic)':  2.39,
+    '2:1':                  2,
     '5:3':                  5/3,
     '5:4':                  5/4,
     '1:1 (square)':         1
