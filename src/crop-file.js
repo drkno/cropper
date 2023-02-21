@@ -70,8 +70,11 @@ class VideoCropper {
         await childProcess.getAwaitablePromise();
     }
 
-    _onConsoleOutput(dataStr) {
+    _onConsoleOutput(childProcess, dataStr) {
         console.error('ffmpeg: ' + dataStr);
+        if (dataStr.includes('Conversion failed!')) {
+            childProcess.abort();
+        }
     }
 
     _parseCropTemplate(template, inputFile, outputFile, crop) {

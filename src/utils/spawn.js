@@ -53,6 +53,11 @@ class ChildProcess extends EventEmitter {
         return this._process.kill(signal);
     }
 
+    async abort() {
+        this._onClose(-2);
+        this.kill(9);
+    }
+
     _spawn(command, args, options) {
         const cmd = spawn(command, args, options);
         cmd.stdout.on('data', this._onStdOut);
@@ -64,7 +69,7 @@ class ChildProcess extends EventEmitter {
 
     _onStdOut(data) {
         const dataStr = data.toString('utf-8');
-        this.emit('stdout', dataStr);
+        this.emit('stdout', this, dataStr);
         if (!this._disableStdPipeAppend) {
             this._stdout += dataStr;
         }
@@ -72,22 +77,29 @@ class ChildProcess extends EventEmitter {
 
     _onStdErr(data) {
         const dataStr = data.toString('utf-8');
-        this.emit('stderr', dataStr);
+        this.emit('stderr', this, dataStr);
         if (!this._disableStdPipeAppend) {
             this._stderr += dataStr;
         }
     }
 
     _onClose(code) {
-        this._code = code;
-        const result = {
-            code: this._code,
-            stdout: this._stdout,
-            stderr: this._stderr
-        };
-        this._resolve(result);
-        this.emit('close', result);
-        this.removeAllListeners();
+        if (this._code === -1) {
+            this._code = code;
+            const result = {
+                code: this._code,
+                stdout: this._stdout,
+                stderr: this._stderr
+            };
+            if (code >= 0) {
+                this._resolve(result);
+                this.emit('close', result);
+            }
+            else {
+                this._onError(result);
+            }
+            this.removeAllListeners();
+        }
     }
 
     _onError(err) {
