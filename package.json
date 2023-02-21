@@ -1,14 +1,14 @@
 {
   "name": "cropper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "src/main.js",
   "repository": "https://github.com/drkno/cropper",
   "author": "Matthew Knox",
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "commander": "^9.4.0",
-    "express": "^4.18.1",
+    "commander": "^10.0.0",
+    "express": "^4.18.2",
     "mv": "^2.1.1",
     "tmp": "^0.2.1"
   },
