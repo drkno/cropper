@@ -1,0 +1,3 @@
+#!/bin/bash
+
+curl localhost:4200/api/1/queue
