@@ -20,12 +20,12 @@ class DimensionsDetector {
         if (dim.x === 0 || dim.y === 0) {
             throw new Error('Could not detect dimensions');
         }
-        if (!this._checkValidityAndSetAspect(dim)) {
-            throw new Error('Cannot calculate dimensions, calculated ended up with an unexpected ratio.');
-        }
         const originalDimensions = await this._getReportedDimensions(file, ffmpegPath);
         dim.fileX = originalDimensions.width;
         dim.fileY = originalDimensions.height;
+        if (!this._checkValidityAndSetAspect(dim)) {
+            throw new Error('Cannot calculate dimensions, calculated ended up with an unexpected ratio.');
+        }
         return dim;
     }
 
@@ -131,10 +131,10 @@ class DimensionsDetector {
 
     _fixCropToMatchAspect(dimension, expected) {
         if (dimension.xOffset === 0 && dimension.yOffset < 10) {
-            dimension.y = Math.floor(dimension.x / expected);
+            dimension.y = Math.min(dimension.fileY, Math.floor(dimension.x / expected));
             dimension.yOffset = 0;
         } else if (dimension.yOffset === 0 && dimension.xOffset < 10) {
-            dimension.x = Math.floor(dimension.y * expected);
+            dimension.x = Math.min(dimension.fileX, Math.floor(dimension.y * expected));
             dimension.xOffset = 0;
         }
     }
