@@ -1,7 +1,8 @@
 import express, { json as ejson } from 'express';
 import { promisify } from 'util';
-import { join } from 'path';
+import { join, basename } from 'path';
 import Queue from './queue.js';
+import { State, LocalSource, RemoteSource, RemoteGroup } from './orm/enums.js';
 
 class Server {
     static port = 4200;
@@ -30,7 +31,7 @@ class Server {
             detail: {
                 type: 'queue',
                 subtype: 'list',
-                items: this.queue.getQueueItems()
+                items: await this.queue.getQueueItems()
             }
         })
     }
@@ -46,7 +47,11 @@ class Server {
             });
             return;
         }
-        const addedPosition = this.queue.addToQueue(req.body.file);
+        const name = basename(req.body.file);
+        const localSource = req.body.localSource ? await LocalSource.getOrAddValue(req.body.localSource) : LocalSource.Manual;
+        const remoteSource = req.body.remoteSource ? await RemoteSource.getOrAddValue(req.body.remoteSource) : RemoteSource.Unknown;
+        const remoteGroup = req.body.remoteGroup ? await RemoteGroup.getOrAddValue(req.body.remoteGroup) : RemoteGroup.Unknown;
+        const addedPosition = await this.queue.addToQueue(name, req.body.file, localSource, remoteSource, remoteGroup);
         res.json({
             success: true,
             detail: {
@@ -64,9 +69,32 @@ class Server {
         const event = req.body;
         switch (event.eventType) {
             case 'Download':
-                const isSonarr = event.series && event.series.path && event.episodeFile && event.episodeFile.relativePath;
-                const isRadarr = event.movie && event.movie.folderPath && event.movieFile && event.movieFile.relativePath;
-                if (!isSonarr && !isRadarr) {
+                let localSource = null;
+                let remoteSource = null;
+                let remoteGroup = null;
+                let addPath = null;
+
+                if (event.series && event.series.path && event.episodeFile && event.episodeFile.relativePath) {
+                    localSource = LocalSource.Sonarr;
+                    remoteSource = await RemoteSource.getOrAddValue(event.series.network || 'Unknown');
+                    if (remoteSource.name() === 'Unknown') {
+                        console.log(event);
+                    }
+                    remoteGroup = await RemoteGroup.getOrAddValue(event.episodeFile.releaseGroup);
+                    addPath = join(event.series.path, event.episodeFile.relativePath);
+                }
+
+                else if (event.movie && event.movie.folderPath && event.movieFile && event.movieFile.relativePath) {
+                    localSource = LocalSource.Radarr;
+                    remoteSource = await RemoteSource.getOrAddValue(event.studio || 'Unknown');
+                    if (remoteSource.name() === 'Unknown') {
+                        console.log(event);
+                    }
+                    remoteGroup = await RemoteGroup.getOrAddValue(event.movieFile.releaseGroup);
+                    addPath = join(event.movie.folderPath, event.movieFile.relativePath);
+                }
+
+                else {
                     console.warn('Request received for downloadFolderImported without an importedPath:\n' + JSON.stringify(event, null, 4));
                     res.json({
                         success: false,
@@ -77,10 +105,9 @@ class Server {
                     });
                     return;
                 }
-                const addPath = isSonarr
-                    ? join(event.series.path, event.episodeFile.relativePath)
-                    : join(event.movie.folderPath, event.movieFile.relativePath);
-                const addedPosition = this.queue.addToQueue(addPath);
+                
+                const name = basename(addPath);
+                const addedPosition = await this.queue.addToQueue(name, addPath, localSource, remoteSource, remoteGroup);
                 res.json({
                     success: true,
                     detail: {
@@ -107,7 +134,7 @@ class Server {
                 const deletePath = isSonarrDelete
                     ? event.episodeFile.path
                     : event.movieFile.path;
-                const episodeDeletedPosition = this.queue.removeFromQueue(deletePath);
+                const episodeDeletedPosition = await this.queue.removeFromQueue(deletePath);
                 res.json({
                     success: true,
                     detail: {

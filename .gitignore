@@ -6,3 +6,4 @@ ffmpeg
 *.mp4
 *.avi
 .yarn
+cropper.db
