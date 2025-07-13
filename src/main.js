@@ -1,8 +1,10 @@
 import { program, InvalidArgumentError } from 'commander';
 import { tmpNameSync } from 'tmp';
-import { resolve, extname } from 'node:path';
+import { resolve, extname, join } from 'node:path';
+import { cwd } from 'process';
 import { unlink } from 'node:fs/promises';
 import { promisify } from 'util';
+import { CronExpressionParser } from 'cron-parser';
 import mv from 'mv';
 import fileExists from './utils/fileExists.js';
 import crop_file, { DefaultFfmpegCropTemplate } from './crop-file.js';
@@ -105,6 +107,27 @@ const parseCrop = value => {
     return value.split(':').map(i => parseInt(i));
 };
 
+const parseCron = (value, previous) => {
+    if (!previous) {
+        previous = [];
+    }
+
+    if (previous.length === 0 || previous[previous.length - 1].hours !== void(0)) {
+        const cron = CronExpressionParser.parse(value);
+        if (!cron) {
+            throw new InvalidArgumentError('Invalid cron expression');
+        }
+        previous.push({ cron });
+    } else {
+        const last = previous[previous.length - 1];
+        last.hours = parseFloat(value);
+        if (isNaN(last.hours)) {
+            throw new InvalidArgumentError('Invalid hours value');
+        }
+    }
+    return previous;
+};
+
 program.name('cropper')
     .description('Detects true size and crops videos using ffmpeg')
     .version('1.0.0')
@@ -130,6 +153,8 @@ program.command('serve')
     .option('-p, --paths <paths>', 'path mappings in the format "request_path:cropper_path,request_path2:cropper_path2"', value => value, '')
     .option('-t, --ffmpeg-options <options>', 'options string to use when cropping', value => value, DefaultFfmpegCropTemplate)
     .option('-m, --metadata', 'crop using metadata instead of re-encoding (h264 and hevc only). This option has inconsistent results in different players.')
+    .option('-w, --window <cron_and_hours...>', 'processing window: <cron_expression> <hours>. Can be specified multiple times.', parseCron, [])
+    .option('-c, --config <path>', 'path to configuration database', value => resolve(value), join(cwd(), 'queue.db'))
     .action(withCommonErrorHandlingAndParsing(serve));
 
 await program.parse();

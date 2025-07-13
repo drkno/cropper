@@ -30,7 +30,7 @@ class Server {
             detail: {
                 type: 'queue',
                 subtype: 'list',
-                items: this.queue.getQueueItems()
+                items: await this.queue.getQueueItems()
             }
         })
     }
@@ -46,7 +46,7 @@ class Server {
             });
             return;
         }
-        const addedPosition = this.queue.addToQueue(req.body.file);
+        const addedPosition = await this.queue.addToQueue(req.body.file);
         res.json({
             success: true,
             detail: {
@@ -80,7 +80,7 @@ class Server {
                 const addPath = isSonarr
                     ? join(event.series.path, event.episodeFile.relativePath)
                     : join(event.movie.folderPath, event.movieFile.relativePath);
-                const addedPosition = this.queue.addToQueue(addPath);
+                const addedPosition = await this.queue.addToQueue(addPath);
                 res.json({
                     success: true,
                     detail: {
@@ -107,7 +107,7 @@ class Server {
                 const deletePath = isSonarrDelete
                     ? event.episodeFile.path
                     : event.movieFile.path;
-                const episodeDeletedPosition = this.queue.removeFromQueue(deletePath);
+                const episodeDeletedPosition = await this.queue.removeFromQueue(deletePath);
                 res.json({
                     success: true,
                     detail: {
