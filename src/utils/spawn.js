@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { delimiter, resolve as pathResolve } from 'node:path';
 import EventEmitter from './EventEmitter.js';
 
@@ -13,10 +14,22 @@ class ChildProcess extends EventEmitter {
         this._onStdErr = this._onStdErr.bind(this);
         this._onError = this._onError.bind(this);
         this._onClose = this._onClose.bind(this);
+        const resolvedExtendedPath = extendedPath
+            .map(p => pathResolve(p))
+            .flatMap(p => existsSync(p) ? [p] : [])
+            .reduce((paths, p) => {
+                paths.push(p);
+                const binPath = pathResolve(p, 'bin');
+                if (existsSync(binPath)) {
+                    paths.push(binPath);
+                }
+                return paths;
+            }, []);
+
         this._process = this._spawn(command, args, Object.assign({
             stdio: ['pipe', 'pipe', 'pipe'],
             env: Object.assign({}, process.env, {
-                PATH: process.env.PATH + delimiter + extendedPath.map(p => pathResolve(p)).join(delimiter)
+                PATH: process.env.PATH + delimiter + resolvedExtendedPath.join(delimiter)
             })
         }, options));
 
